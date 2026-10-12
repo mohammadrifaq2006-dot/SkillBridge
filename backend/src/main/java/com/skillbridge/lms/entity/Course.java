@@ -17,6 +17,9 @@ public class Course {
     @Column(nullable = false, length = 80)
     private String category;
 
+    @Column(length = 40)
+    private String difficulty = "Intermediate";
+
     @Column(nullable = false, columnDefinition = "TEXT")
     private String description;
 
@@ -38,13 +41,22 @@ public class Course {
     @Column(name = "image_url", length = 500)
     private String imageUrl;
 
+    @Column(nullable = false, columnDefinition = "BOOLEAN DEFAULT TRUE")
+    private Boolean published = true;
+
     public Course() {
     }
 
     public Course(String title, String category, String description, String instructor,
                   String duration, BigDecimal price, String syllabus, String prerequisites, String imageUrl) {
+        this(title, category, "Intermediate", description, instructor, duration, price, syllabus, prerequisites, imageUrl, true);
+    }
+
+    public Course(String title, String category, String difficulty, String description, String instructor,
+                  String duration, BigDecimal price, String syllabus, String prerequisites, String imageUrl, Boolean published) {
         this.title = title;
         this.category = category;
+        this.difficulty = (difficulty != null && !difficulty.isBlank()) ? difficulty : "Intermediate";
         this.description = description;
         this.instructor = instructor;
         this.duration = duration;
@@ -52,6 +64,21 @@ public class Course {
         this.syllabus = syllabus;
         this.prerequisites = prerequisites;
         this.imageUrl = imageUrl;
+        this.published = published != null ? published : true;
+    }
+
+    @PrePersist
+    @PreUpdate
+    protected void applyDefaults() {
+        if (this.difficulty == null || this.difficulty.isBlank()) {
+            this.difficulty = "Intermediate";
+        }
+        if (this.published == null) {
+            this.published = true;
+        }
+        if (this.price == null) {
+            this.price = BigDecimal.ZERO;
+        }
     }
 
     public Long getId() {
@@ -76,6 +103,14 @@ public class Course {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getDifficulty() {
+        return difficulty != null ? difficulty : "Intermediate";
+    }
+
+    public void setDifficulty(String difficulty) {
+        this.difficulty = difficulty;
     }
 
     public String getDescription() {
@@ -132,5 +167,13 @@ public class Course {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public Boolean getPublished() {
+        return published == null || published;
+    }
+
+    public void setPublished(Boolean published) {
+        this.published = published;
     }
 }

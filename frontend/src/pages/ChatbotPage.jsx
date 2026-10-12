@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from 'react';
-import axiosClient from '../api/axiosClient';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { RefreshCw, Send, Sparkles, Trash2 } from 'lucide-react';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 
 const INITIAL_MESSAGES = [
   {
@@ -12,6 +13,7 @@ const INITIAL_MESSAGES = [
 
 export default function ChatbotPage() {
   const [status, setStatus] = useState(null);
+  const [statusError, setStatusError] = useState('');
   const [messages, setMessages] = useState(() => {
     try {
       const saved = sessionStorage.getItem('skillbridge_chat_history');
@@ -21,16 +23,26 @@ export default function ChatbotPage() {
     }
   });
   const [question, setQuestion] = useState('');
+  const [lastFailedQuestion, setLastFailedQuestion] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [error, setError] = useState('');
   const messagesEndRef = useRef(null);
 
-  useEffect(() => {
-    axiosClient
-      .get('/chatbot/status')
-      .then((res) => setStatus(res.data))
-      .catch(() => {});
+  const loadChatbotStatus = useCallback(async () => {
+    try {
+      setStatusError('');
+      const res = await axiosClient.get('/chatbot/status');
+      setStatus(res.data);
+    } catch (err) {
+      setStatusError(
+        extractApiError(err, 'Unable to verify AI assistant status from the backend server.')
+      );
+    }
   }, []);
+
+  useEffect(() => {
+    loadChatbotStatus();
+  }, [loadChatbotStatus]);
 
   useEffect(() => {
     try {
@@ -46,6 +58,7 @@ export default function ChatbotPage() {
     if (!trimmed || isTyping) return;
 
     setError('');
+    setLastFailedQuestion('');
     const userMsg = { role: 'user', content: trimmed };
     const historyForBackend = messages.map((m) => ({
       role: m.role,
@@ -70,10 +83,13 @@ export default function ChatbotPage() {
       };
       setMessages((prev) => [...prev, assistantMsg]);
     } catch (err) {
-      const errMsg =
-        err.response?.data?.message ||
-        'Failed to communicate with the AI chatbot backend endpoint.';
-      setError(errMsg);
+      setLastFailedQuestion(trimmed);
+      setError(
+        extractApiError(
+          err,
+          'The AI Learning Assistant is temporarily unavailable. Please try again.'
+        )
+      );
     } finally {
       setIsTyping(false);
     }
@@ -88,6 +104,7 @@ export default function ChatbotPage() {
     sessionStorage.removeItem('skillbridge_chat_history');
     setMessages(INITIAL_MESSAGES);
     setError('');
+    setLastFailedQuestion('');
   };
 
   return (
@@ -96,38 +113,71 @@ export default function ChatbotPage() {
         <div>
           <h1 className="page-title">AI Learning Assistant (RAG)</h1>
           <p className="page-subtitle" style={{ marginBottom: 0 }}>
-            Ask questions about SkillBridge courses, prerequisites, or study plans.
+            Ask questions about SkillBridge courses, prerequisites, syllabi, or study paths.
           </p>
         </div>
         <button type="button" className="btn btn-secondary btn-sm" onClick={handleClearSession}>
+          <Trash2 size={14} />
           Clear Session History
         </button>
       </div>
 
+      {statusError && (
+        <div className="alert alert-error">
+          <span>{statusError}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadChatbotStatus}>
+            <RefreshCw size={14} />
+            Retry Connection
+          </button>
+        </div>
+      )}
+
       {status && !status.configured && (
         <div className="alert alert-warning">
-          <strong>Configuration Notice:</strong> The external LLM API key is not currently set on
-          the backend. Set the <code>LLM_API_KEY</code> (or <code>GEMINI_API_KEY</code>) environment
-          variable before starting the Spring Boot server to enable live AI generation. MySQL
-          course context retrieval (RAG) remains active.
+          <div>
+            <strong>AI Provider Configuration Required:</strong> The server environment variable{' '}
+            <code>LLM_API_KEY</code> (or <code>GEMINI_API_KEY</code>) is not currently set on the
+            backend. MySQL course retrieval (RAG) is active ({status.indexedCourseCount} published
+            courses indexed), and live AI responses will activate automatically once{' '}
+            <code>LLM_API_KEY</code> is configured on Render.
+          </div>
         </div>
       )}
 
       {status && status.configured && (
         <div className="alert alert-info">
-          Connected to external LLM provider (<strong>{status.provider}</strong> /{' '}
-          <code>{status.model}</code>) with <strong>{status.indexedCourseCount}</strong> courses
-          indexed in MySQL for RAG context.
+          <span>
+            <Sparkles size={15} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+            Connected to AI provider (<strong>{status.provider}</strong> /{' '}
+            <code>{status.model}</code>) with <strong>{status.indexedCourseCount}</strong> published
+            courses indexed in MySQL for RAG context.
+          </span>
         </div>
       )}
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <span>{error}</span>
+          {lastFailedQuestion && (
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => sendQuestion(lastFailedQuestion)}
+              disabled={isTyping}
+            >
+              <RefreshCw size={14} />
+              Retry Question
+            </button>
+          )}
+        </div>
+      )}
 
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
         {[
           'What free courses are available on SkillBridge?',
           'Which course covers Spring Boot and REST APIs?',
           'What are the prerequisites for the Security & JWT course?',
+          'Recommend a beginner-friendly learning path.',
         ].map((sample, idx) => (
           <button
             key={idx}
@@ -142,6 +192,18 @@ export default function ChatbotPage() {
       </div>
 
       <div className="chat-container">
+        <div className="chat-header-strip">
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontWeight: 600 }}>
+            <Sparkles size={15} style={{ color: 'var(--teal)' }} />
+            SkillBridge AI Learning Assistant
+          </span>
+          <span style={{ fontSize: 12, opacity: 0.85 }}>
+            {status
+              ? `MySQL RAG Index: ${status.indexedCourseCount} courses`
+              : 'Connecting to backend...'}
+          </span>
+        </div>
+
         <div className="chat-messages">
           {messages.map((msg, index) => (
             <div key={index} className={`chat-bubble ${msg.role}`}>
@@ -151,9 +213,9 @@ export default function ChatbotPage() {
                   style={{
                     marginTop: 8,
                     paddingTop: 6,
-                    borderTop: '1px solid var(--border-color)',
+                    borderTop: '1px solid var(--border-light)',
                     fontSize: 12,
-                    color: 'var(--text-grey)',
+                    color: 'var(--text-muted)',
                   }}
                 >
                   <strong>MySQL RAG Context Retrieved:</strong> {msg.retrievedCourses.join(', ')}
@@ -164,7 +226,7 @@ export default function ChatbotPage() {
 
           {isTyping && (
             <div className="chat-bubble assistant" role="status">
-              <em>Typing response...</em>
+              <em>Retrieving MySQL course context and generating response...</em>
             </div>
           )}
           <div ref={messagesEndRef} />
@@ -174,7 +236,7 @@ export default function ChatbotPage() {
           <input
             type="text"
             className="form-control"
-            placeholder="Ask a question about SkillBridge courses..."
+            placeholder="Ask a question about SkillBridge courses, syllabi, or prerequisites..."
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             disabled={isTyping}
@@ -185,7 +247,8 @@ export default function ChatbotPage() {
             className="btn btn-primary"
             disabled={isTyping || !question.trim()}
           >
-            {isTyping ? 'Waiting...' : 'Send'}
+            <Send size={15} />
+            {isTyping ? 'Sending...' : 'Send'}
           </button>
         </form>
       </div>

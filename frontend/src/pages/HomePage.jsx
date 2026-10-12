@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import axiosClient from '../api/axiosClient';
+import { ArrowRight, BookOpen, RefreshCw, Sparkles } from 'lucide-react';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 import CourseCard from '../components/CourseCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -11,54 +12,57 @@ export default function HomePage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    let isMounted = true;
-    async function fetchHomeData() {
-      try {
-        setLoading(true);
-        const [coursesRes, categoriesRes] = await Promise.all([
-          axiosClient.get('/courses'),
-          axiosClient.get('/courses/categories'),
-        ]);
-        if (isMounted) {
-          setCourses(coursesRes.data);
-          setCategories(categoriesRes.data);
-          setError('');
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.response?.data?.message || 'Unable to load courses from the server.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+  const fetchHomeData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const [coursesRes, categoriesRes] = await Promise.all([
+        axiosClient.get('/courses'),
+        axiosClient.get('/courses/categories'),
+      ]);
+      setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : []);
+      setCategories(Array.isArray(categoriesRes.data) ? categoriesRes.data : []);
+    } catch (err) {
+      setError(
+        extractApiError(
+          err,
+          'Unable to load courses from the server. Please check your connection and try again.'
+        )
+      );
+    } finally {
+      setLoading(false);
     }
-    fetchHomeData();
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchHomeData();
+  }, [fetchHomeData]);
 
   const featuredCourses = courses.slice(0, 6);
 
   return (
     <div>
-      {/* Hero / Introduction Section */}
-      <section className="section card" style={{ padding: '28px 24px', backgroundColor: 'var(--bg-subtle)' }}>
-        <h1 className="page-title" style={{ fontSize: 28 }}>
-          SkillBridge – Online Learning Platform
+      {/* Hero Banner */}
+      <section className="hero-banner">
+        <div className="hero-eyebrow">
+          <BookOpen size={14} />
+          <span>Structured Technical Education</span>
+        </div>
+        <h1 className="hero-title">
+          Build Practical Software Engineering Skills with SkillBridge
         </h1>
-        <p style={{ color: 'var(--text-dark-grey)', maxWidth: 740, marginBottom: 20, fontSize: 16 }}>
-          SkillBridge is a structured online learning platform designed for students to explore technical courses,
-          enroll in subjects of interest, track module-by-module progress, and download completion certificates.
+        <p className="hero-subtitle">
+          Explore structured computer science and software development courses with transparent
+          syllabi, track module-by-module completion on your personal dashboard, and earn
+          downloadable completion certificates.
         </p>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link to="/courses" className="btn btn-primary">
-            Browse Courses
+        <div className="hero-actions">
+          <Link to="/courses" className="btn btn-teal">
+            Browse Course Catalog
+            <ArrowRight size={16} />
           </Link>
-          <Link to="/chatbot" className="btn btn-secondary">
+          <Link to="/chatbot" className="btn btn-outline-light">
+            <Sparkles size={16} />
             Ask AI Learning Assistant
           </Link>
         </div>
@@ -67,10 +71,17 @@ export default function HomePage() {
       {/* Learning Categories Section */}
       <section className="section">
         <div className="section-header">
-          <h2>Learning Categories</h2>
+          <div>
+            <h2>Subject Categories</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+              Select a domain to filter courses in the catalog
+            </p>
+          </div>
         </div>
-        {categories.length === 0 && !loading ? (
-          <p style={{ color: 'var(--text-grey)' }}>No categories available yet.</p>
+        {categories.length === 0 && !loading && !error ? (
+          <p style={{ color: 'var(--text-muted)' }}>
+            No published categories are currently available.
+          </p>
         ) : (
           <div className="category-list">
             {categories.map((cat) => (
@@ -90,16 +101,33 @@ export default function HomePage() {
       {/* Available Courses Section */}
       <section className="section">
         <div className="section-header">
-          <h2>Available Courses</h2>
-          <Link to="/courses">View Full Catalog &rarr;</Link>
+          <div>
+            <h2>Published Courses</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+              Loaded directly from the SkillBridge MySQL catalog
+            </p>
+          </div>
+          <Link to="/courses" className="btn btn-secondary btn-sm">
+            View Full Catalog &rarr;
+          </Link>
         </div>
 
-        {loading && <LoadingSpinner message="Loading available courses..." />}
-        {error && <div className="alert alert-error">{error}</div>}
+        {loading && <LoadingSpinner message="Loading published courses from the database..." />}
+
+        {error && (
+          <div className="alert alert-error">
+            <span>{error}</span>
+            <button type="button" className="btn btn-secondary btn-sm" onClick={fetchHomeData}>
+              <RefreshCw size={14} />
+              Retry
+            </button>
+          </div>
+        )}
 
         {!loading && !error && featuredCourses.length === 0 && (
           <div className="empty-state">
-            <p>No courses are currently available in the catalog.</p>
+            <h3 style={{ color: 'var(--navy)', marginBottom: 6 }}>No Courses Currently Published</h3>
+            <p>There are currently no published courses in the database.</p>
           </div>
         )}
 
@@ -113,14 +141,17 @@ export default function HomePage() {
       </section>
 
       {/* About Section */}
-      <section className="section card">
-        <h2 style={{ marginBottom: 10 }}>About SkillBridge</h2>
-        <p style={{ color: 'var(--text-dark-grey)', marginBottom: 12 }}>
-          SkillBridge connects foundational computer science concepts with practical engineering skills. Students can
-          register for an account, browse categorized courses with clear syllabi and prerequisites, track their own
-          completion percentage on the Learner Dashboard, and download a verified completion certificate upon finishing a course.
+      <section className="section card" style={{ borderLeft: '4px solid var(--teal)' }}>
+        <h2 style={{ marginBottom: 10, color: 'var(--navy)' }}>How SkillBridge Works</h2>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 16 }}>
+          SkillBridge connects foundational engineering coursework with hands-on software practice.
+          Browse any course syllabus publicly, create a learner account to enroll, update your module
+          completion percentage as you study, and download a verified completion certificate when you
+          reach 100%.
         </p>
-        <Link to="/about">Read More & Contact Us &rarr;</Link>
+        <Link to="/about" className="btn btn-secondary btn-sm">
+          Learn More & Contact Support &rarr;
+        </Link>
       </section>
     </div>
   );

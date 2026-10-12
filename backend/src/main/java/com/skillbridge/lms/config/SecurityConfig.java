@@ -24,10 +24,13 @@ import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @Configuration
 @EnableWebSecurity
@@ -37,7 +40,7 @@ public class SecurityConfig {
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    @Value("${skillbridge.cors.allowed-origins:http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
+    @Value("${skillbridge.cors.allowed-origins:https://*.onrender.com,http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173}")
     private String allowedOrigins;
 
     public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
@@ -78,6 +81,8 @@ public class SecurityConfig {
                         })
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Preflight OPTIONS requests must always be permitted
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         // Public Auth Endpoints
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/reset-password").permitAll()
                         // Public Course Catalog Endpoints
@@ -106,13 +111,26 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.stream(allowedOrigins.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-        config.setAllowedOrigins(origins);
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept"));
+        Set<String> originPatterns = new LinkedHashSet<>();
+
+        if (allowedOrigins != null && !allowedOrigins.isBlank()) {
+            Arrays.stream(allowedOrigins.split(","))
+                    .map(String::trim)
+                    .map(s -> s.replaceAll("/+$", ""))
+                    .filter(s -> !s.isEmpty() && !"*".equals(s))
+                    .forEach(originPatterns::add);
+        }
+
+        // Always ensure Render frontend origins and local dev origins work reliably
+        originPatterns.add("https://*.onrender.com");
+        originPatterns.add("http://localhost:5173");
+        originPatterns.add("http://localhost:3000");
+        originPatterns.add("http://127.0.0.1:5173");
+
+        config.setAllowedOriginPatterns(new ArrayList<>(originPatterns));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Accept", "Origin", "X-Requested-With"));
+        config.setExposedHeaders(List.of("Authorization"));
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 

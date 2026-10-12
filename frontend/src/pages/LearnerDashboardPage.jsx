@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Award, PlayCircle } from 'lucide-react';
-import axiosClient from '../api/axiosClient';
+import { Award, PlayCircle, RefreshCw } from 'lucide-react';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -17,22 +17,22 @@ export default function LearnerDashboardPage() {
   const [progressInput, setProgressInput] = useState(0);
   const [savingProgress, setSavingProgress] = useState(false);
 
-  const fetchMyEnrollments = async () => {
+  const fetchMyEnrollments = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axiosClient.get('/enrollments/my');
-      setEnrollments(res.data);
       setError('');
+      const res = await axiosClient.get('/enrollments/my');
+      setEnrollments(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Unable to load your enrolled courses.');
+      setError(extractApiError(err, 'Unable to load your enrolled courses.'));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchMyEnrollments();
-  }, []);
+  }, [fetchMyEnrollments]);
 
   const openLearningModal = (enrollment) => {
     setActiveEnrollment(enrollment);
@@ -42,7 +42,7 @@ export default function LearnerDashboardPage() {
 
   const handleSaveProgress = async (e) => {
     e.preventDefault();
-    if (!activeEnrollment) return;
+    if (!activeEnrollment || savingProgress) return;
 
     const numericProgress = Math.min(100, Math.max(0, Number(progressInput)));
     try {
@@ -61,7 +61,7 @@ export default function LearnerDashboardPage() {
           : `Progress for "${res.data.courseTitle}" updated to ${numericProgress}%.`
       );
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to update course progress.');
+      setError(extractApiError(err, 'Failed to update course progress.'));
     } finally {
       setSavingProgress(false);
     }
@@ -74,34 +74,34 @@ export default function LearnerDashboardPage() {
     const ctx = canvas.getContext('2d');
 
     // White background
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Outer & inner borders
-    ctx.strokeStyle = '#1d4ed8';
-    ctx.lineWidth = 6;
-    ctx.strokeRect(30, 30, 940, 640);
+    // Outer Deep Navy border & inner Teal border
+    ctx.strokeStyle = '#14213D';
+    ctx.lineWidth = 8;
+    ctx.strokeRect(28, 28, 944, 644);
 
-    ctx.strokeStyle = '#d1d5db';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(44, 44, 912, 612);
+    ctx.strokeStyle = '#14B8A6';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(42, 42, 916, 616);
 
     // Header
-    ctx.fillStyle = '#111827';
+    ctx.fillStyle = '#14213D';
     ctx.textAlign = 'center';
-    ctx.font = 'bold 28px Arial, sans-serif';
+    ctx.font = 'bold 28px Inter, Arial, sans-serif';
     ctx.fillText('SKILLBRIDGE – ONLINE LEARNING PLATFORM', 500, 125);
 
-    ctx.fillStyle = '#1d4ed8';
+    ctx.fillStyle = '#2563EB';
     ctx.font = 'bold 38px Georgia, serif';
     ctx.fillText('CERTIFICATE OF COMPLETION', 500, 195);
 
-    ctx.fillStyle = '#4b5563';
-    ctx.font = '18px Arial, sans-serif';
+    ctx.fillStyle = '#334155';
+    ctx.font = '18px Inter, Arial, sans-serif';
     ctx.fillText('This is to certify that', 500, 260);
 
     // Student Name
-    ctx.fillStyle = '#111827';
+    ctx.fillStyle = '#14213D';
     ctx.font = 'bold 34px Georgia, serif';
     ctx.fillText(user?.name || enrollment.userName || 'Learner', 500, 315);
 
@@ -109,17 +109,17 @@ export default function LearnerDashboardPage() {
     ctx.beginPath();
     ctx.moveTo(280, 330);
     ctx.lineTo(720, 330);
-    ctx.strokeStyle = '#9ca3af';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#14B8A6';
+    ctx.lineWidth = 2;
     ctx.stroke();
 
-    ctx.fillStyle = '#4b5563';
-    ctx.font = '18px Arial, sans-serif';
+    ctx.fillStyle = '#334155';
+    ctx.font = '18px Inter, Arial, sans-serif';
     ctx.fillText('has successfully completed the online course', 500, 380);
 
     // Course Title
-    ctx.fillStyle = '#1d4ed8';
-    ctx.font = 'bold 28px Arial, sans-serif';
+    ctx.fillStyle = '#2563EB';
+    ctx.font = 'bold 28px Inter, Arial, sans-serif';
     ctx.fillText(enrollment.courseTitle, 500, 430);
 
     // Metadata
@@ -127,8 +127,8 @@ export default function LearnerDashboardPage() {
       ? new Date(enrollment.lastUpdated).toLocaleDateString()
       : new Date().toLocaleDateString();
 
-    ctx.fillStyle = '#374151';
-    ctx.font = '16px Arial, sans-serif';
+    ctx.fillStyle = '#14213D';
+    ctx.font = '16px Inter, Arial, sans-serif';
     ctx.fillText(
       `Category: ${enrollment.courseCategory}  |  Duration: ${enrollment.courseDuration}`,
       500,
@@ -137,19 +137,19 @@ export default function LearnerDashboardPage() {
 
     // Footer signatures
     ctx.textAlign = 'left';
-    ctx.fillStyle = '#111827';
-    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillStyle = '#14213D';
+    ctx.font = 'bold 16px Inter, Arial, sans-serif';
     ctx.fillText(`Instructor: ${enrollment.courseInstructor}`, 100, 580);
-    ctx.font = '14px Arial, sans-serif';
-    ctx.fillStyle = '#6b7280';
+    ctx.font = '14px Inter, Arial, sans-serif';
+    ctx.fillStyle = '#64748B';
     ctx.fillText(`Certificate ID: SB-CERT-${enrollment.id}-${enrollment.courseId}`, 100, 605);
 
     ctx.textAlign = 'right';
-    ctx.fillStyle = '#111827';
-    ctx.font = 'bold 16px Arial, sans-serif';
+    ctx.fillStyle = '#14213D';
+    ctx.font = 'bold 16px Inter, Arial, sans-serif';
     ctx.fillText(`Completion Date: ${completionDate}`, 900, 580);
-    ctx.font = '14px Arial, sans-serif';
-    ctx.fillStyle = '#6b7280';
+    ctx.font = '14px Inter, Arial, sans-serif';
+    ctx.fillStyle = '#64748B';
     ctx.fillText('Verified by SkillBridge LMS', 900, 605);
 
     const dataUrl = canvas.toDataURL('image/png');
@@ -170,7 +170,7 @@ export default function LearnerDashboardPage() {
         <div>
           <h1 className="page-title">Learner Dashboard</h1>
           <p className="page-subtitle" style={{ marginBottom: 0 }}>
-            Welcome, <strong>{user?.name}</strong> ({user?.email})
+            Signed in as <strong>{user?.name}</strong> ({user?.email})
           </p>
         </div>
         <Link to="/courses" className="btn btn-primary">
@@ -178,17 +178,23 @@ export default function LearnerDashboardPage() {
         </Link>
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={fetchMyEnrollments}>
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
+      )}
       {statusMessage && <div className="alert alert-success">{statusMessage}</div>}
 
       {loading && <LoadingSpinner message="Loading your enrolled courses..." />}
 
-      {!loading && enrollments.length === 0 && (
+      {!loading && !error && enrollments.length === 0 && (
         <div className="empty-state">
-          <h3 style={{ color: 'var(--text-black)', marginBottom: 8 }}>
-            No Course Enrollments Yet
-          </h3>
-          <p style={{ marginBottom: 16 }}>
+          <h3 style={{ color: 'var(--navy)', marginBottom: 8 }}>No Course Enrollments Yet</h3>
+          <p style={{ marginBottom: 18 }}>
             Your learner dashboard is currently empty. Browse the course catalog and enroll in a
             course to start tracking your progress.
           </p>
@@ -205,10 +211,16 @@ export default function LearnerDashboardPage() {
             const isCompleted = pct >= 100 || enrollment.status === 'COMPLETED';
 
             return (
-              <div key={enrollment.id} className="card">
+              <div
+                key={enrollment.id}
+                className="card"
+                style={{
+                  borderTop: `4px solid ${isCompleted ? 'var(--teal)' : 'var(--royal-blue)'}`,
+                }}
+              >
                 <div className="course-meta-row">
                   <span className="badge badge-accent">{enrollment.courseCategory}</span>
-                  <span className={`badge ${isCompleted ? 'badge-free' : ''}`}>
+                  <span className={`badge ${isCompleted ? 'badge-teal' : ''}`}>
                     {isCompleted ? 'COMPLETED' : 'IN PROGRESS'}
                   </span>
                 </div>
@@ -228,6 +240,7 @@ export default function LearnerDashboardPage() {
                       justifyContent: 'space-between',
                       fontSize: 13,
                       fontWeight: 600,
+                      color: 'var(--navy)',
                     }}
                   >
                     <span>Completion Progress</span>
@@ -239,7 +252,7 @@ export default function LearnerDashboardPage() {
                       style={{ width: `${pct}%` }}
                     />
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--text-grey)' }}>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     Enrolled on:{' '}
                     {enrollment.enrollmentDate
                       ? new Date(enrollment.enrollmentDate).toLocaleDateString()
@@ -260,7 +273,7 @@ export default function LearnerDashboardPage() {
                   {isCompleted && (
                     <button
                       type="button"
-                      className="btn btn-secondary btn-sm"
+                      className="btn btn-teal btn-sm"
                       onClick={() => handleDownloadCertificate(enrollment)}
                     >
                       <Award size={15} />
@@ -283,15 +296,17 @@ export default function LearnerDashboardPage() {
             </div>
 
             <div style={{ marginBottom: 16 }}>
-              <h4 style={{ fontSize: 14, marginBottom: 6 }}>Course Syllabus Modules</h4>
+              <h4 style={{ fontSize: 14, color: 'var(--navy)', marginBottom: 6 }}>
+                Course Syllabus Modules
+              </h4>
               <div
                 style={{
-                  backgroundColor: 'var(--bg-subtle)',
+                  backgroundColor: 'var(--bg-light)',
                   border: '1px solid var(--border-light)',
-                  borderRadius: 6,
-                  padding: 12,
-                  fontSize: 13,
-                  color: 'var(--text-dark-grey)',
+                  borderRadius: 8,
+                  padding: 14,
+                  fontSize: 13.5,
+                  color: 'var(--text-secondary)',
                   whiteSpace: 'pre-line',
                 }}
               >

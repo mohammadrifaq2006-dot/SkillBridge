@@ -17,6 +17,9 @@ public class CourseRequest {
     @Size(min = 2, max = 80, message = "Category must be between 2 and 80 characters")
     private String category;
 
+    @Size(max = 40, message = "Difficulty must be under 40 characters")
+    private String difficulty = "Intermediate";
+
     @NotBlank(message = "Description is required")
     @Size(min = 10, max = 3000, message = "Description must be at least 10 characters")
     private String description;
@@ -43,6 +46,8 @@ public class CourseRequest {
 
     private String imageUrl;
 
+    private Boolean published = true;
+
     public CourseRequest() {
     }
 
@@ -60,6 +65,14 @@ public class CourseRequest {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getDifficulty() {
+        return difficulty;
+    }
+
+    public void setDifficulty(String difficulty) {
+        this.difficulty = difficulty;
     }
 
     public String getDescription() {
@@ -116,5 +129,13 @@ public class CourseRequest {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public Boolean getPublished() {
+        return published;
+    }
+
+    public void setPublished(Boolean published) {
+        this.published = published;
     }
 }

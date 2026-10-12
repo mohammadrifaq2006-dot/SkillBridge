@@ -1,10 +1,12 @@
 package com.skillbridge.lms.controller;
 
 import com.skillbridge.lms.dto.ContactInquiryResponse;
+import com.skillbridge.lms.dto.CourseResponse;
 import com.skillbridge.lms.dto.EnrollmentResponse;
 import com.skillbridge.lms.dto.UserResponse;
 import com.skillbridge.lms.service.AuthService;
 import com.skillbridge.lms.service.ContactService;
+import com.skillbridge.lms.service.CourseService;
 import com.skillbridge.lms.service.EnrollmentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -19,19 +21,28 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/admin")
 @PreAuthorize("hasRole('ADMIN')")
-@Tag(name = "Administration", description = "Administrator endpoints for viewing registered users, enrollments, and inquiries")
+@Tag(name = "Administration", description = "Administrator endpoints for viewing courses, registered users, enrollments, and inquiries")
 public class AdminController {
 
     private final AuthService authService;
     private final EnrollmentService enrollmentService;
     private final ContactService contactService;
+    private final CourseService courseService;
 
     public AdminController(AuthService authService,
                            EnrollmentService enrollmentService,
-                           ContactService contactService) {
+                           ContactService contactService,
+                           CourseService courseService) {
         this.authService = authService;
         this.enrollmentService = enrollmentService;
         this.contactService = contactService;
+        this.courseService = courseService;
+    }
+
+    @GetMapping("/courses")
+    @Operation(summary = "View all courses including unpublished drafts (Admin only)")
+    public ResponseEntity<List<CourseResponse>> getAllCourses() {
+        return ResponseEntity.ok(courseService.getAllCoursesForAdmin());
     }
 
     @GetMapping("/users")

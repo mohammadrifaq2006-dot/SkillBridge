@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import axiosClient from '../api/axiosClient';
+import { CheckCircle2, Clock, Layers, RefreshCw, User } from 'lucide-react';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 import LoadingSpinner from '../components/LoadingSpinner';
 
@@ -16,40 +17,29 @@ export default function CourseDetailsPage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  useEffect(() => {
-    let isMounted = true;
-    async function loadCourseDetails() {
-      try {
-        setLoading(true);
-        const courseRes = await axiosClient.get(`/courses/${id}`);
-        if (isMounted) {
-          setCourse(courseRes.data);
-          setError('');
-        }
-        if (isAuthenticated) {
-          const myEnrollmentsRes = await axiosClient.get('/enrollments/my');
-          if (isMounted) {
-            const match = myEnrollmentsRes.data.find(
-              (enr) => String(enr.courseId) === String(id)
-            );
-            setExistingEnrollment(match || null);
-          }
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.response?.data?.message || 'Course could not be loaded.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+  const loadCourseDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const courseRes = await axiosClient.get(`/courses/${id}`);
+      setCourse(courseRes.data);
+
+      if (isAuthenticated) {
+        const myEnrollmentsRes = await axiosClient.get('/enrollments/my');
+        const list = Array.isArray(myEnrollmentsRes.data) ? myEnrollmentsRes.data : [];
+        const match = list.find((enr) => String(enr.courseId) === String(id));
+        setExistingEnrollment(match || null);
       }
+    } catch (err) {
+      setError(extractApiError(err, 'Course details could not be loaded.'));
+    } finally {
+      setLoading(false);
     }
-    loadCourseDetails();
-    return () => {
-      isMounted = false;
-    };
   }, [id, isAuthenticated]);
+
+  useEffect(() => {
+    loadCourseDetails();
+  }, [loadCourseDetails]);
 
   const handleEnroll = async () => {
     if (!isAuthenticated) {
@@ -62,9 +52,9 @@ export default function CourseDetailsPage() {
       setSuccessMsg('');
       const res = await axiosClient.post(`/enrollments/course/${id}`);
       setExistingEnrollment(res.data);
-      setSuccessMsg('You have been enrolled in this course! Your enrollment is saved in MySQL.');
+      setSuccessMsg('You are now enrolled in this course! Your progress record has been created.');
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to enroll in this course.');
+      setError(extractApiError(err, 'Failed to enroll in this course.'));
     } finally {
       setEnrolling(false);
     }
@@ -77,15 +67,22 @@ export default function CourseDetailsPage() {
   if (!course) {
     return (
       <div className="card">
-        <div className="alert alert-error">{error || 'Course not found.'}</div>
+        <div className="alert alert-error">
+          <span>{error || 'Course not found.'}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadCourseDetails}>
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
         <Link to="/courses" className="btn btn-secondary">
-          &larr; Back to Catalog
+          &larr; Back to Course Catalog
         </Link>
       </div>
     );
   }
 
   const isFree = course.free || Number(course.price) === 0;
+  const difficulty = course.difficulty || 'Intermediate';
   const syllabusLines = (course.syllabus || '')
     .split('\n')
     .map((line) => line.trim())
@@ -93,7 +90,7 @@ export default function CourseDetailsPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: 16 }}>
+      <div style={{ marginBottom: 18 }}>
         <Link to="/courses" className="btn btn-secondary btn-sm">
           &larr; Back to Course Catalog
         </Link>
@@ -102,7 +99,7 @@ export default function CourseDetailsPage() {
       {error && <div className="alert alert-error">{error}</div>}
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
-      <div className="card section">
+      <div className="card section" style={{ borderTop: '4px solid var(--royal-blue)' }}>
         {course.imageUrl && (
           <img
             src={course.imageUrl}
@@ -110,57 +107,99 @@ export default function CourseDetailsPage() {
             loading="lazy"
             style={{
               width: '100%',
-              maxHeight: 240,
+              maxHeight: 260,
               objectFit: 'cover',
-              borderRadius: 6,
-              marginBottom: 16,
+              borderRadius: 8,
+              marginBottom: 18,
               border: '1px solid var(--border-light)',
             }}
           />
         )}
 
-        <div className="course-meta-row" style={{ marginBottom: 12 }}>
-          <span className="badge badge-accent">{course.category}</span>
+        <div className="course-meta-row" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <span className="badge badge-accent">{course.category}</span>
+            <span className="badge">
+              <Layers size={12} />
+              {difficulty}
+            </span>
+          </div>
           <span className={`badge ${isFree ? 'badge-free' : 'badge-paid'}`}>
             {isFree ? 'Free Course' : `Paid Course (₹${Number(course.price).toFixed(2)})`}
           </span>
         </div>
 
         <h1 className="page-title">{course.title}</h1>
-        <p style={{ color: 'var(--text-grey)', marginBottom: 16, fontSize: 14 }}>
-          <strong>Instructor:</strong> {course.instructor} &nbsp;|&nbsp;{' '}
-          <strong>Duration:</strong> {course.duration}
-        </p>
+        <div
+          style={{
+            display: 'flex',
+            gap: 20,
+            flexWrap: 'wrap',
+            color: 'var(--text-muted)',
+            marginBottom: 20,
+            fontSize: 14,
+          }}
+        >
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <User size={15} />
+            <strong>Instructor:</strong> {course.instructor}
+          </span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Clock size={15} />
+            <strong>Duration:</strong> {course.duration}
+          </span>
+        </div>
 
-        <h3 style={{ fontSize: 16, marginBottom: 6 }}>Course Description</h3>
-        <p style={{ color: 'var(--text-dark-grey)', marginBottom: 20 }}>{course.description}</p>
+        <h3 style={{ fontSize: 17, color: 'var(--navy)', marginBottom: 8 }}>Course Overview</h3>
+        <p style={{ color: 'var(--text-secondary)', marginBottom: 24 }}>{course.description}</p>
 
-        <div className="grid-2" style={{ marginBottom: 20 }}>
-          <div className="card" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-            <h3 style={{ fontSize: 16, marginBottom: 8 }}>Syllabus</h3>
+        <div className="grid-2" style={{ marginBottom: 24 }}>
+          <div className="card" style={{ backgroundColor: 'var(--bg-light)' }}>
+            <h3 style={{ fontSize: 17, color: 'var(--navy)', marginBottom: 12 }}>
+              Course Syllabus
+            </h3>
             {syllabusLines.length > 0 ? (
-              <ul style={{ paddingLeft: 18, color: 'var(--text-dark-grey)' }}>
+              <ul style={{ listStyle: 'none', padding: 0 }}>
                 {syllabusLines.map((item, idx) => (
-                  <li key={idx} style={{ marginBottom: 4 }}>
-                    {item}
+                  <li
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 8,
+                      marginBottom: 10,
+                      color: 'var(--text-secondary)',
+                      fontSize: 14,
+                    }}
+                  >
+                    <CheckCircle2
+                      size={16}
+                      style={{ color: 'var(--teal-dark)', flexShrink: 0, marginTop: 3 }}
+                    />
+                    <span>{item}</span>
                   </li>
                 ))}
               </ul>
             ) : (
-              <p>{course.syllabus}</p>
+              <p style={{ color: 'var(--text-secondary)' }}>{course.syllabus}</p>
             )}
           </div>
 
-          <div className="card" style={{ backgroundColor: 'var(--bg-subtle)' }}>
-            <h3 style={{ fontSize: 16, marginBottom: 8 }}>Prerequisites & Instructor Info</h3>
-            <p style={{ marginBottom: 12, color: 'var(--text-dark-grey)' }}>
+          <div className="card" style={{ backgroundColor: 'var(--bg-light)' }}>
+            <h3 style={{ fontSize: 17, color: 'var(--navy)', marginBottom: 12 }}>
+              Prerequisites & Academic Details
+            </h3>
+            <p style={{ marginBottom: 14, color: 'var(--text-secondary)', fontSize: 14 }}>
               <strong>Prerequisites:</strong> {course.prerequisites}
             </p>
-            <p style={{ color: 'var(--text-dark-grey)' }}>
+            <p style={{ marginBottom: 10, color: 'var(--text-secondary)', fontSize: 14 }}>
+              <strong>Difficulty Level:</strong> {difficulty}
+            </p>
+            <p style={{ marginBottom: 10, color: 'var(--text-secondary)', fontSize: 14 }}>
               <strong>Lead Instructor:</strong> {course.instructor}
             </p>
-            <p style={{ color: 'var(--text-grey)', fontSize: 13, marginTop: 4 }}>
-              Estimated Completion Time: {course.duration}
+            <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+              Estimated Study Duration: {course.duration}
             </p>
           </div>
         </div>
@@ -172,13 +211,13 @@ export default function CourseDetailsPage() {
             justifyContent: 'space-between',
             flexWrap: 'wrap',
             gap: 12,
-            paddingTop: 16,
+            paddingTop: 18,
             borderTop: '1px solid var(--border-light)',
           }}
         >
           {existingEnrollment ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span className="badge badge-free">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <span className="badge badge-teal">
                 Enrolled ({existingEnrollment.completionPercentage}% Completed)
               </span>
               <Link to="/dashboard" className="btn btn-primary">

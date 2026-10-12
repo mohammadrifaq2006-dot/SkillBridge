@@ -14,6 +14,7 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
     List<Course> findByCategoryIgnoreCaseOrderByIdAsc(String category);
 
     @Query("SELECT c FROM Course c WHERE " +
+           "(c.published IS NULL OR c.published = true) AND " +
            "(:category IS NULL OR :category = '' OR LOWER(c.category) = LOWER(:category)) AND " +
            "(:keyword IS NULL OR :keyword = '' OR " +
            "LOWER(c.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
@@ -23,6 +24,8 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
            "ORDER BY c.id ASC")
     List<Course> searchCourses(@Param("keyword") String keyword, @Param("category") String category);
 
-    @Query("SELECT DISTINCT c.category FROM Course c ORDER BY c.category ASC")
+    @Query("SELECT DISTINCT c.category FROM Course c WHERE (c.published IS NULL OR c.published = true) ORDER BY c.category ASC")
     List<String> findDistinctCategories();
+
+    List<Course> findAllByOrderByIdAsc();
 }

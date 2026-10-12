@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import axiosClient from '../api/axiosClient';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 
 const FAQ_ITEMS = [
   {
@@ -65,6 +65,7 @@ export default function AboutContactPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setServerError('');
     setSavedInquiry(null);
     if (!validate()) {
@@ -79,7 +80,6 @@ export default function AboutContactPage() {
         subject: formData.subject.trim(),
         message: formData.message.trim(),
       });
-      // Only show success message after inquiry has actually been saved in MySQL
       if (res.status === 201 && res.data?.id) {
         setSavedInquiry(res.data);
         setFormData({ name: '', email: '', subject: '', message: '' });
@@ -89,7 +89,7 @@ export default function AboutContactPage() {
         setErrors(err.response.data.errors);
       }
       setServerError(
-        err.response?.data?.message || 'Failed to save your inquiry. Please try again.'
+        extractApiError(err, 'Failed to save your inquiry. Please check your connection and try again.')
       );
     } finally {
       setSubmitting(false);
@@ -99,35 +99,39 @@ export default function AboutContactPage() {
   return (
     <div>
       {/* Mission Statement */}
-      <section className="section card">
+      <section className="section card" style={{ borderTop: '4px solid var(--royal-blue)' }}>
         <h1 className="page-title">About SkillBridge</h1>
-        <h3 style={{ fontSize: 16, marginBottom: 8, color: 'var(--text-dark-grey)' }}>
-          Our Mission Statement
+        <h3 style={{ fontSize: 16, marginBottom: 8, color: 'var(--navy)' }}>
+          Our Academic Mission
         </h3>
-        <p style={{ color: 'var(--text-dark-grey)' }}>
-          SkillBridge is an academic online learning platform built to make structured technical
-          education accessible, transparent, and practical. Our mission is to provide engineering
-          students with clear course syllabi, milestone-based progress tracking, and verifiable
-          completion certificates within a clean, distraction-free learning environment.
+        <p style={{ color: 'var(--text-secondary)' }}>
+          SkillBridge is an online learning platform built to make structured technical education
+          accessible, transparent, and practical. Our mission is to provide engineering students
+          with clear course syllabi, milestone-based progress tracking, and verifiable completion
+          certificates within a clean, distraction-free learning environment.
         </p>
       </section>
 
       <div className="grid-2">
         {/* Basic FAQ Section */}
         <section className="section card">
-          <h2 style={{ fontSize: 20, marginBottom: 16 }}>Frequently Asked Questions</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 18, color: 'var(--navy)' }}>
+            Frequently Asked Questions
+          </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {FAQ_ITEMS.map((item, idx) => (
               <div
                 key={idx}
                 style={{
-                  paddingBottom: 12,
+                  paddingBottom: 14,
                   borderBottom:
                     idx < FAQ_ITEMS.length - 1 ? '1px solid var(--border-light)' : 'none',
                 }}
               >
-                <h4 style={{ fontSize: 15, marginBottom: 4 }}>{item.question}</h4>
-                <p style={{ fontSize: 14, color: 'var(--text-dark-grey)' }}>{item.answer}</p>
+                <h4 style={{ fontSize: 15, marginBottom: 5, color: 'var(--navy)' }}>
+                  {item.question}
+                </h4>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{item.answer}</p>
               </div>
             ))}
           </div>
@@ -135,16 +139,18 @@ export default function AboutContactPage() {
 
         {/* Contact Form Section */}
         <section className="section card">
-          <h2 style={{ fontSize: 20, marginBottom: 8 }}>Contact Us</h2>
+          <h2 style={{ fontSize: 20, marginBottom: 8, color: 'var(--navy)' }}>Contact Support</h2>
           <p className="page-subtitle">
-            Have a question about a course or need support? Submit an inquiry below.
+            Have a question about a course or need technical assistance? Submit an inquiry below.
           </p>
 
           {serverError && <div className="alert alert-error">{serverError}</div>}
           {savedInquiry && (
             <div className="alert alert-success">
-              Thank you, <strong>{savedInquiry.name}</strong>! Your inquiry (Reference ID: #
-              {savedInquiry.id}) has been saved in the database.
+              <span>
+                Thank you, <strong>{savedInquiry.name}</strong>! Your inquiry (Reference ID: #
+                {savedInquiry.id}) has been saved in the database.
+              </span>
             </div>
           )}
 

@@ -65,17 +65,28 @@ class SecurityAuthorizationTest {
     }
 
     @Test
+    void corsPreflightOptions_ShouldAllowRenderFrontendOrigin() throws Exception {
+        mockMvc.perform(options("/api/courses")
+                        .header("Origin", "https://skillbridge-frontend.onrender.com")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://skillbridge-frontend.onrender.com"));
+    }
+
+    @Test
     void createCourse_ShouldReturn401_WhenUnauthenticated() throws Exception {
         String courseJson = """
                 {
                   "title": "Test Course",
                   "category": "Testing",
+                  "difficulty": "Beginner",
                   "description": "Valid course description for testing.",
                   "instructor": "Prof. Test",
                   "duration": "4 Weeks",
                   "price": 0,
                   "syllabus": "Module 1: Unit Testing",
-                  "prerequisites": "None"
+                  "prerequisites": "None",
+                  "published": true
                 }
                 """;
 
@@ -92,12 +103,14 @@ class SecurityAuthorizationTest {
                 {
                   "title": "Test Course",
                   "category": "Testing",
+                  "difficulty": "Beginner",
                   "description": "Valid course description for testing.",
                   "instructor": "Prof. Test",
                   "duration": "4 Weeks",
                   "price": 0,
                   "syllabus": "Module 1: Unit Testing",
-                  "prerequisites": "None"
+                  "prerequisites": "None",
+                  "published": true
                 }
                 """;
 
@@ -113,8 +126,10 @@ class SecurityAuthorizationTest {
         CourseResponse created = new CourseResponse();
         created.setId(99L);
         created.setTitle("Test Course");
+        created.setDifficulty("Beginner");
         created.setPrice(BigDecimal.ZERO);
         created.setFree(true);
+        created.setPublished(true);
 
         when(courseService.createCourse(any())).thenReturn(created);
 
@@ -122,12 +137,14 @@ class SecurityAuthorizationTest {
                 {
                   "title": "Test Course",
                   "category": "Testing",
+                  "difficulty": "Beginner",
                   "description": "Valid course description for testing.",
                   "instructor": "Prof. Test",
                   "duration": "4 Weeks",
                   "price": 0,
                   "syllabus": "Module 1: Unit Testing",
-                  "prerequisites": "None"
+                  "prerequisites": "None",
+                  "published": true
                 }
                 """;
 
@@ -143,6 +160,15 @@ class SecurityAuthorizationTest {
     void adminUsersEndpoint_ShouldReturn403_ForLearnerRole() throws Exception {
         mockMvc.perform(get("/api/admin/users"))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(username = "admin@skillbridge.edu", roles = {"ADMIN"})
+    void adminCoursesEndpoint_ShouldReturn200_ForAdminRole() throws Exception {
+        when(courseService.getAllCoursesForAdmin()).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/admin/courses"))
+                .andExpect(status().isOk());
     }
 
     @Test

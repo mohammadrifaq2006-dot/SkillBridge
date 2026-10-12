@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { extractApiError } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 
 export default function RegisterPage() {
@@ -45,6 +46,7 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setServerError('');
     if (!validate()) {
       return;
@@ -61,11 +63,14 @@ export default function RegisterPage() {
       navigate('/dashboard');
     } catch (err) {
       const apiErrors = err.response?.data?.errors;
-      if (apiErrors) {
+      if (apiErrors && typeof apiErrors === 'object') {
         setErrors(apiErrors);
       }
       setServerError(
-        err.response?.data?.message || 'Registration failed. Please check your input and try again.'
+        extractApiError(
+          err,
+          'Registration could not be completed. Please review the highlighted fields and try again.'
+        )
       );
     } finally {
       setSubmitting(false);
@@ -74,10 +79,10 @@ export default function RegisterPage() {
 
   return (
     <div className="form-container">
-      <div className="card">
+      <div className="card auth-card">
         <h1 className="page-title">Create a Learner Account</h1>
         <p className="page-subtitle">
-          Register to enroll in courses, track your progress, and download certificates.
+          Register to enroll in courses, track your module completion, and download certificates.
         </p>
 
         {serverError && <div className="alert alert-error">{serverError}</div>}
@@ -91,6 +96,7 @@ export default function RegisterPage() {
               id="name"
               name="name"
               type="text"
+              autoComplete="name"
               className="form-control"
               value={formData.name}
               onChange={handleChange}
@@ -107,6 +113,7 @@ export default function RegisterPage() {
               id="email"
               name="email"
               type="email"
+              autoComplete="email"
               className="form-control"
               value={formData.email}
               onChange={handleChange}
@@ -123,10 +130,11 @@ export default function RegisterPage() {
               id="password"
               name="password"
               type="password"
+              autoComplete="new-password"
               className="form-control"
               value={formData.password}
               onChange={handleChange}
-              placeholder="At least 6 characters"
+              placeholder="Minimum 6 characters"
             />
             {errors.password && <div className="form-error">{errors.password}</div>}
           </div>
@@ -139,6 +147,7 @@ export default function RegisterPage() {
               id="confirmPassword"
               name="confirmPassword"
               type="password"
+              autoComplete="new-password"
               className="form-control"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -153,11 +162,11 @@ export default function RegisterPage() {
             style={{ width: '100%' }}
             disabled={submitting}
           >
-            {submitting ? 'Creating Account...' : 'Register'}
+            {submitting ? 'Creating Account...' : 'Create Account'}
           </button>
         </form>
 
-        <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center', color: 'var(--text-grey)' }}>
+        <p style={{ marginTop: 18, fontSize: 14, textAlign: 'center', color: 'var(--text-muted)' }}>
           Already have an account? <Link to="/login">Log in here</Link>
         </p>
       </div>

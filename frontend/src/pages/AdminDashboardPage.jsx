@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import axiosClient from '../api/axiosClient';
+import React, { useCallback, useEffect, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 import ConfirmModal from '../components/ConfirmModal';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Pagination from '../components/Pagination';
@@ -7,6 +8,7 @@ import Pagination from '../components/Pagination';
 const INITIAL_COURSE_FORM = {
   title: '',
   category: '',
+  difficulty: 'Intermediate',
   instructor: '',
   duration: '',
   price: '0',
@@ -14,6 +16,7 @@ const INITIAL_COURSE_FORM = {
   syllabus: '',
   prerequisites: 'None',
   imageUrl: '',
+  published: true,
 };
 
 const ITEMS_PER_PAGE = 8;
@@ -44,30 +47,34 @@ export default function AdminDashboardPage() {
   // Pagination
   const [coursePage, setCoursePage] = useState(1);
 
-  const loadAdminData = async () => {
+  const loadAdminData = useCallback(async () => {
     try {
       setLoading(true);
+      setError('');
       const [coursesRes, usersRes, enrollmentsRes, inquiriesRes] = await Promise.all([
-        axiosClient.get('/courses'),
+        axiosClient.get('/admin/courses'),
         axiosClient.get('/admin/users'),
         axiosClient.get('/admin/enrollments'),
         axiosClient.get('/admin/inquiries'),
       ]);
-      setCourses(coursesRes.data);
-      setUsers(usersRes.data);
-      setEnrollments(enrollmentsRes.data);
-      setInquiries(inquiriesRes.data);
-      setError('');
+      setCourses(Array.isArray(coursesRes.data) ? coursesRes.data : []);
+      setUsers(Array.isArray(usersRes.data) ? usersRes.data : []);
+      setEnrollments(Array.isArray(enrollmentsRes.data) ? enrollmentsRes.data : []);
+      setInquiries(Array.isArray(inquiriesRes.data) ? inquiriesRes.data : []);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to load administrative records.');
+      setError(extractApiError(err, 'Failed to load administrative records.'));
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadAdminData();
-  }, []);
+  }, [loadAdminData]);
+
+  const distinctCategories = Array.from(
+    new Set(courses.map((c) => c.category).filter(Boolean))
+  ).sort();
 
   const validateCourseForm = () => {
     const errs = {};
@@ -113,6 +120,7 @@ export default function AdminDashboardPage() {
     setFormData({
       title: course.title || '',
       category: course.category || '',
+      difficulty: course.difficulty || 'Intermediate',
       instructor: course.instructor || '',
       duration: course.duration || '',
       price: String(course.price ?? 0),
@@ -120,6 +128,7 @@ export default function AdminDashboardPage() {
       syllabus: course.syllabus || '',
       prerequisites: course.prerequisites || 'None',
       imageUrl: course.imageUrl || '',
+      published: course.published !== false,
     });
     setFormErrors({});
     setShowForm(true);
@@ -129,6 +138,7 @@ export default function AdminDashboardPage() {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setError('');
     setSuccessMsg('');
     if (!validateCourseForm()) {
@@ -136,7 +146,6 @@ export default function AdminDashboardPage() {
     }
 
     if (editingCourseId) {
-      // Open edit confirmation modal before updating
       setPendingEditConfirm(true);
     } else {
       await executeSaveCourse();
@@ -148,6 +157,7 @@ export default function AdminDashboardPage() {
     const payload = {
       title: formData.title.trim(),
       category: formData.category.trim(),
+      difficulty: formData.difficulty || 'Intermediate',
       instructor: formData.instructor.trim(),
       duration: formData.duration.trim(),
       price: Number(formData.price),
@@ -155,6 +165,7 @@ export default function AdminDashboardPage() {
       syllabus: formData.syllabus.trim(),
       prerequisites: formData.prerequisites.trim(),
       imageUrl: formData.imageUrl.trim() || null,
+      published: Boolean(formData.published),
     };
 
     try {
@@ -164,7 +175,7 @@ export default function AdminDashboardPage() {
         setSuccessMsg(`Course "${payload.title}" updated in MySQL.`);
       } else {
         await axiosClient.post('/courses', payload);
-        setSuccessMsg(`Course "${payload.title}" added to MySQL.`);
+        setSuccessMsg(`Course "${payload.title}" created in MySQL.`);
       }
       setShowForm(false);
       setEditingCourseId(null);
@@ -174,7 +185,7 @@ export default function AdminDashboardPage() {
       if (err.response?.data?.errors) {
         setFormErrors(err.response.data.errors);
       }
-      setError(err.response?.data?.message || 'Failed to save course.');
+      setError(extractApiError(err, 'Failed to save course.'));
     } finally {
       setSubmitting(false);
     }
@@ -190,7 +201,7 @@ export default function AdminDashboardPage() {
       setCourseToDelete(null);
       await loadAdminData();
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to delete course.');
+      setError(extractApiError(err, 'Failed to delete course.'));
       setCourseToDelete(null);
     }
   };
@@ -205,9 +216,9 @@ export default function AdminDashboardPage() {
     <div>
       <div className="section-header">
         <div>
-          <h1 className="page-title">Course & Platform Management</h1>
+          <h1 className="page-title">Administrator Console</h1>
           <p className="page-subtitle" style={{ marginBottom: 0 }}>
-            Administrator dashboard for managing courses, viewing registered users, and monitoring enrollments.
+            Manage courses, categories, publication status, registered learners, and enrollments.
           </p>
         </div>
         {activeTab === 'courses' && !showForm && (
@@ -217,7 +228,15 @@ export default function AdminDashboardPage() {
         )}
       </div>
 
-      {error && <div className="alert alert-error">{error}</div>}
+      {error && (
+        <div className="alert alert-error">
+          <span>{error}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={loadAdminData}>
+            <RefreshCw size={14} />
+            Retry
+          </button>
+        </div>
+      )}
       {successMsg && <div className="alert alert-success">{successMsg}</div>}
 
       <div className="tabs">
@@ -226,7 +245,7 @@ export default function AdminDashboardPage() {
           className={`tab-btn ${activeTab === 'courses' ? 'active' : ''}`}
           onClick={() => setActiveTab('courses')}
         >
-          Courses ({courses.length})
+          Courses & Categories ({courses.length})
         </button>
         <button
           type="button"
@@ -251,15 +270,15 @@ export default function AdminDashboardPage() {
         </button>
       </div>
 
-      {loading && <LoadingSpinner message="Loading records..." />}
+      {loading && <LoadingSpinner message="Loading administrative records..." />}
 
       {/* Tab 1: Courses Management */}
       {!loading && activeTab === 'courses' && (
         <div>
           {showForm && (
-            <div className="card section">
+            <div className="card section" style={{ borderTop: '4px solid var(--royal-blue)' }}>
               <div className="section-header">
-                <h3>{editingCourseId ? 'Edit Course' : 'Add New Course'}</h3>
+                <h3>{editingCourseId ? 'Edit Course' : 'Create New Course'}</h3>
                 <button
                   type="button"
                   className="btn btn-secondary btn-sm"
@@ -292,12 +311,34 @@ export default function AdminDashboardPage() {
                     <input
                       id="course-category"
                       type="text"
+                      list="existing-categories"
                       className="form-control"
-                      placeholder="e.g., Web Development, Database Systems"
+                      placeholder="Select or type a category (e.g., Web Development)"
                       value={formData.category}
                       onChange={(e) => setFormData({ ...formData, category: e.target.value })}
                     />
+                    <datalist id="existing-categories">
+                      {distinctCategories.map((cat) => (
+                        <option key={cat} value={cat} />
+                      ))}
+                    </datalist>
                     {formErrors.category && <div className="form-error">{formErrors.category}</div>}
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="course-difficulty" className="form-label">
+                      Difficulty Level *
+                    </label>
+                    <select
+                      id="course-difficulty"
+                      className="form-control"
+                      value={formData.difficulty}
+                      onChange={(e) => setFormData({ ...formData, difficulty: e.target.value })}
+                    >
+                      <option value="Beginner">Beginner</option>
+                      <option value="Intermediate">Intermediate</option>
+                      <option value="Advanced">Advanced</option>
+                    </select>
                   </div>
 
                   <div className="form-group">
@@ -346,22 +387,22 @@ export default function AdminDashboardPage() {
                     />
                     {formErrors.price && <div className="form-error">{formErrors.price}</div>}
                   </div>
+                </div>
 
-                  <div className="form-group">
-                    <label htmlFor="course-prerequisites" className="form-label">
-                      Prerequisites *
-                    </label>
-                    <input
-                      id="course-prerequisites"
-                      type="text"
-                      className="form-control"
-                      value={formData.prerequisites}
-                      onChange={(e) => setFormData({ ...formData, prerequisites: e.target.value })}
-                    />
-                    {formErrors.prerequisites && (
-                      <div className="form-error">{formErrors.prerequisites}</div>
-                    )}
-                  </div>
+                <div className="form-group">
+                  <label htmlFor="course-prerequisites" className="form-label">
+                    Prerequisites *
+                  </label>
+                  <input
+                    id="course-prerequisites"
+                    type="text"
+                    className="form-control"
+                    value={formData.prerequisites}
+                    onChange={(e) => setFormData({ ...formData, prerequisites: e.target.value })}
+                  />
+                  {formErrors.prerequisites && (
+                    <div className="form-error">{formErrors.prerequisites}</div>
+                  )}
                 </div>
 
                 <div className="form-group">
@@ -395,6 +436,19 @@ export default function AdminDashboardPage() {
                   {formErrors.syllabus && <div className="form-error">{formErrors.syllabus}</div>}
                 </div>
 
+                <div className="form-group" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <input
+                    id="course-published"
+                    type="checkbox"
+                    checked={Boolean(formData.published)}
+                    onChange={(e) => setFormData({ ...formData, published: e.target.checked })}
+                    style={{ width: 17, height: 17 }}
+                  />
+                  <label htmlFor="course-published" className="form-label" style={{ marginBottom: 0 }}>
+                    Publish course to public Course Catalog
+                  </label>
+                </div>
+
                 <div style={{ display: 'flex', gap: 10 }}>
                   <button type="submit" className="btn btn-primary" disabled={submitting}>
                     {submitting
@@ -426,9 +480,10 @@ export default function AdminDashboardPage() {
                       <th>ID</th>
                       <th>Title</th>
                       <th>Category</th>
+                      <th>Difficulty</th>
                       <th>Instructor</th>
-                      <th>Duration</th>
                       <th>Price</th>
+                      <th>Status</th>
                       <th>Actions</th>
                     </tr>
                   </thead>
@@ -440,12 +495,21 @@ export default function AdminDashboardPage() {
                           <strong>{course.title}</strong>
                         </td>
                         <td>{course.category}</td>
+                        <td>{course.difficulty || 'Intermediate'}</td>
                         <td>{course.instructor}</td>
-                        <td>{course.duration}</td>
                         <td>
                           {course.free || Number(course.price) === 0
                             ? 'Free'
                             : `₹${Number(course.price).toFixed(2)}`}
+                        </td>
+                        <td>
+                          <span
+                            className={`badge ${
+                              course.published !== false ? 'badge-teal' : ''
+                            }`}
+                          >
+                            {course.published !== false ? 'Published' : 'Draft'}
+                          </span>
                         </td>
                         <td>
                           <div style={{ display: 'flex', gap: 8 }}>
@@ -501,11 +565,11 @@ export default function AdminDashboardPage() {
                   <td>{u.name}</td>
                   <td>{u.email}</td>
                   <td>
-                    <span className="badge">{u.role}</span>
+                    <span className={`badge ${u.role === 'ADMIN' ? 'badge-navy' : 'badge-accent'}`}>
+                      {u.role}
+                    </span>
                   </td>
-                  <td>
-                    {u.creationDate ? new Date(u.creationDate).toLocaleString() : 'N/A'}
-                  </td>
+                  <td>{u.creationDate ? new Date(u.creationDate).toLocaleString() : 'N/A'}</td>
                 </tr>
               ))}
             </tbody>
@@ -543,7 +607,7 @@ export default function AdminDashboardPage() {
                       <td>
                         <span
                           className={`badge ${
-                            enr.status === 'COMPLETED' ? 'badge-free' : ''
+                            enr.status === 'COMPLETED' ? 'badge-teal' : ''
                           }`}
                         >
                           {enr.status}
@@ -592,9 +656,7 @@ export default function AdminDashboardPage() {
                       </td>
                       <td>{inq.message}</td>
                       <td>
-                        {inq.creationDate
-                          ? new Date(inq.creationDate).toLocaleString()
-                          : 'N/A'}
+                        {inq.creationDate ? new Date(inq.creationDate).toLocaleString() : 'N/A'}
                       </td>
                     </tr>
                   ))}

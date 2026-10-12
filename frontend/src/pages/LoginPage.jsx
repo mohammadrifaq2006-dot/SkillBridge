@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { extractApiError } from '../api/axiosClient';
 import { useAuth } from '../context/AuthContext';
 
 export default function LoginPage() {
@@ -28,6 +29,7 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setServerError('');
     clearSessionMessage();
     if (!validate()) {
@@ -42,7 +44,7 @@ export default function LoginPage() {
         (loggedInUser.role === 'ADMIN' ? '/admin' : '/dashboard');
       navigate(destination, { replace: true });
     } catch (err) {
-      setServerError(err.response?.data?.message || 'Invalid email or password.');
+      setServerError(extractApiError(err, 'Invalid email or password.'));
     } finally {
       setSubmitting(false);
     }
@@ -50,7 +52,7 @@ export default function LoginPage() {
 
   return (
     <div className="form-container">
-      <div className="card">
+      <div className="card auth-card">
         <h1 className="page-title">Log In to SkillBridge</h1>
         <p className="page-subtitle">
           Enter your registered email and password to access your dashboard.
@@ -67,6 +69,7 @@ export default function LoginPage() {
             <input
               id="email"
               type="email"
+              autoComplete="email"
               className="form-control"
               value={email}
               onChange={(e) => {
@@ -85,6 +88,7 @@ export default function LoginPage() {
             <input
               id="password"
               type="password"
+              autoComplete="current-password"
               className="form-control"
               value={password}
               onChange={(e) => {
@@ -96,7 +100,7 @@ export default function LoginPage() {
             {errors.password && <div className="form-error">{errors.password}</div>}
           </div>
 
-          <div style={{ textAlign: 'right', marginBottom: 16, fontSize: 13 }}>
+          <div style={{ textAlign: 'right', marginBottom: 18, fontSize: 13 }}>
             <Link to="/reset-password">Forgot password?</Link>
           </div>
 
@@ -110,8 +114,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center', color: 'var(--text-grey)' }}>
-          Don&apos;t have an account? <Link to="/register">Register here</Link>
+        <p style={{ marginTop: 18, fontSize: 14, textAlign: 'center', color: 'var(--text-muted)' }}>
+          Don&apos;t have an account? <Link to="/register">Create a learner account</Link>
         </p>
       </div>
     </div>

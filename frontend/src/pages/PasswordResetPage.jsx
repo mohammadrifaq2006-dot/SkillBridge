@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import axiosClient from '../api/axiosClient';
+import axiosClient, { extractApiError } from '../api/axiosClient';
 
 export default function PasswordResetPage() {
   const [formData, setFormData] = useState({
@@ -43,6 +43,7 @@ export default function PasswordResetPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (submitting) return;
     setServerError('');
     setSuccessMsg('');
     if (!validate()) {
@@ -61,7 +62,7 @@ export default function PasswordResetPage() {
       setFormData({ email: '', name: '', newPassword: '', confirmPassword: '' });
     } catch (err) {
       setServerError(
-        err.response?.data?.message || 'Unable to reset password. Please check your details.'
+        extractApiError(err, 'Unable to reset password. Please check your account details.')
       );
     } finally {
       setSubmitting(false);
@@ -70,16 +71,19 @@ export default function PasswordResetPage() {
 
   return (
     <div className="form-container">
-      <div className="card">
+      <div className="card auth-card">
         <h1 className="page-title">Reset Password</h1>
         <p className="page-subtitle">
-          Verify your registered email and full name to set a new BCrypt-hashed password in MySQL.
+          Verify your registered email and full name to set a new BCrypt-hashed password.
         </p>
 
         {serverError && <div className="alert alert-error">{serverError}</div>}
         {successMsg && (
           <div className="alert alert-success">
-            {successMsg} <Link to="/login">Proceed to Log In &rarr;</Link>
+            <span>{successMsg}</span>
+            <Link to="/login" className="btn btn-primary btn-sm">
+              Proceed to Log In &rarr;
+            </Link>
           </div>
         )}
 
@@ -158,7 +162,7 @@ export default function PasswordResetPage() {
           </button>
         </form>
 
-        <p style={{ marginTop: 16, fontSize: 14, textAlign: 'center', color: 'var(--text-grey)' }}>
+        <p style={{ marginTop: 18, fontSize: 14, textAlign: 'center', color: 'var(--text-muted)' }}>
           Remember your password? <Link to="/login">Back to Log In</Link>
         </p>
       </div>

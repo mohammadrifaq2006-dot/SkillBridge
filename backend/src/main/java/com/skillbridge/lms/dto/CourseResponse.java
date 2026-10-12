@@ -9,6 +9,7 @@ public class CourseResponse {
     private Long id;
     private String title;
     private String category;
+    private String difficulty;
     private String description;
     private String instructor;
     private String duration;
@@ -17,6 +18,7 @@ public class CourseResponse {
     private String syllabus;
     private String prerequisites;
     private String imageUrl;
+    private boolean published;
 
     public CourseResponse() {
     }
@@ -26,6 +28,9 @@ public class CourseResponse {
         dto.setId(course.getId());
         dto.setTitle(course.getTitle());
         dto.setCategory(course.getCategory());
+        dto.setDifficulty(course.getDifficulty() != null && !course.getDifficulty().isBlank()
+                ? course.getDifficulty()
+                : "Intermediate");
         dto.setDescription(course.getDescription());
         dto.setInstructor(course.getInstructor());
         dto.setDuration(course.getDuration());
@@ -35,6 +40,7 @@ public class CourseResponse {
         dto.setSyllabus(course.getSyllabus());
         dto.setPrerequisites(course.getPrerequisites());
         dto.setImageUrl(course.getImageUrl());
+        dto.setPublished(course.getPublished() == null || course.getPublished());
         return dto;
     }
 
@@ -60,6 +66,14 @@ public class CourseResponse {
 
     public void setCategory(String category) {
         this.category = category;
+    }
+
+    public String getDifficulty() {
+        return difficulty;
+    }
+
+    public void setDifficulty(String difficulty) {
+        this.difficulty = difficulty;
     }
 
     public String getDescription() {
@@ -124,5 +138,13 @@ public class CourseResponse {
 
     public void setImageUrl(String imageUrl) {
         this.imageUrl = imageUrl;
+    }
+
+    public boolean isPublished() {
+        return published;
+    }
+
+    public void setPublished(boolean published) {
+        this.published = published;
     }
 }

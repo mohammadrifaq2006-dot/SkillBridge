@@ -41,6 +41,14 @@ public class CourseService {
     }
 
     @Transactional(readOnly = true)
+    public List<CourseResponse> getAllCoursesForAdmin() {
+        return courseRepository.findAllByOrderByIdAsc()
+                .stream()
+                .map(CourseResponse::fromEntity)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public CourseResponse getCourseById(Long id) {
         Course course = courseRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with ID: " + id));
@@ -59,7 +67,7 @@ public class CourseService {
         Course course = new Course();
         applyRequestToEntity(request, course);
         Course saved = courseRepository.save(course);
-        log.info("Created course ID={} title='{}'", saved.getId(), saved.getTitle());
+        log.info("Created course ID={} title='{}' published={}", saved.getId(), saved.getTitle(), saved.getPublished());
         return CourseResponse.fromEntity(saved);
     }
 
@@ -70,7 +78,7 @@ public class CourseService {
                 .orElseThrow(() -> new ResourceNotFoundException("Course not found with ID: " + id));
         applyRequestToEntity(request, course);
         Course updated = courseRepository.save(course);
-        log.info("Updated course ID={} title='{}'", updated.getId(), updated.getTitle());
+        log.info("Updated course ID={} title='{}' published={}", updated.getId(), updated.getTitle(), updated.getPublished());
         return CourseResponse.fromEntity(updated);
     }
 
@@ -87,6 +95,9 @@ public class CourseService {
     private void applyRequestToEntity(CourseRequest request, Course course) {
         course.setTitle(request.getTitle().trim());
         course.setCategory(request.getCategory().trim());
+        course.setDifficulty(request.getDifficulty() != null && !request.getDifficulty().isBlank()
+                ? request.getDifficulty().trim()
+                : "Intermediate");
         course.setDescription(request.getDescription().trim());
         course.setInstructor(request.getInstructor().trim());
         course.setDuration(request.getDuration().trim());
@@ -96,5 +107,6 @@ public class CourseService {
         course.setImageUrl(request.getImageUrl() != null && !request.getImageUrl().isBlank()
                 ? request.getImageUrl().trim()
                 : null);
+        course.setPublished(request.getPublished() == null || request.getPublished());
     }
 }
