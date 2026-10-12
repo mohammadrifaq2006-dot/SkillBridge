@@ -1,9 +1,6 @@
-.env
-.env.*
-!.env.example
-**/node_modules/
-**/target/
-**/dist/
-.vscode/
+target/
+uploads/
+*.class
+.DS_Store
 .idea/
-*.log
+*.iml
